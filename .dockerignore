@@ -1,0 +1,22 @@
+# Keep the build context small and deterministic.
+.git/
+.github/
+.venv/
+__pycache__/
+*.egg-info/
+*.pyc
+
+# Generated output and real supplier documents. Only the synthetic sample
+# invoice is ever committed, and .gitignore enforces that on the git side too.
+out/
+invoices/*
+!invoices/sample-invoice.pdf
+
+# Docs are not needed to run the tool.
+docs/
+*.md
+!README.md
+
+# The test suite and its fixtures are not needed in the image either; CI runs
+# them against the source tree.
+tests/

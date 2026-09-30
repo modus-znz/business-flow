@@ -1,0 +1,114 @@
+name: ci
+
+# The test suite runs the real harvest against the committed synthetic sample,
+# so a change to the column anchoring fails the build rather than producing a
+# plausible-looking wrong CSV later. The YAML checks below pin the schema the
+# extractor reads by name.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Every module compiles
+        run: python -m compileall -q bizflow install.py
+
+      # Everything below needs the real dependencies: pyyaml for the schema
+      # check, and the full set for the harvest itself.
+      - name: Install
+        run: pip install -e .
+
+      # The extractor reads these keys by name and raises KeyError at runtime if
+      # one disappears. A layout rename is the single most likely way to break
+      # this repo, so the schema is pinned here instead of discovered in
+      # production against a real supplier's PDF.
+      - name: Layout and template YAML match the schema the code reads
+        run: |
+          python - <<'PY'
+          import sys, yaml, pathlib
+          bad = []
+          layout = yaml.safe_load(open("bizflow/layouts/it.sample-vendor.yml"))
+          for key in ("code_regex", "columns"):
+              if key not in layout:
+                  bad.append(f"layout missing {key}")
+          for name, spec in (layout.get("columns") or {}).items():
+              spec = {"header": spec} if isinstance(spec, (str, list)) else spec
+              if "header" not in spec:
+                  bad.append(f"layout column {name} has no header")
+          tpl = yaml.safe_load(open("templates/it.sample-vendor.yml"))
+          for key in ("issuer", "keywords", "fields", "options"):
+              if key not in tpl:
+                  bad.append(f"template missing {key}")
+          for key in ("invoice_number", "date", "amount"):
+              if key not in (tpl.get("fields") or {}):
+                  bad.append(f"template fields missing {key}")
+          if bad:
+              print("\n".join(bad)); sys.exit(1)
+          print("layout + template schema ok")
+          PY
+
+      - name: Test suite
+        # Exercises pdfplumber, invoice2data, duckdb and the layout against
+        # invoices/sample-invoice.pdf. Needs the full dependency set, not just
+        # the stdlib checks above.
+        run: python -m unittest discover -s tests -v
+
+      - name: The CLI wires up
+        run: |
+          python -m bizflow --help
+          python -m bizflow process --help
+
+      - name: The default layout the CLI advertises actually exists
+        run: |
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          from bizflow.__main__ import DEFAULT_LAYOUT
+          if not Path(DEFAULT_LAYOUT).is_file():
+              print(f"DEFAULT_LAYOUT points at a missing file: {DEFAULT_LAYOUT}")
+              sys.exit(1)
+          print(f"default layout present: {DEFAULT_LAYOUT.name}")
+          PY
+
+      - name: The sample stays synthetic
+        # The leak this guards against was a real supplier's legal name in a
+        # template, a layout file name, a docstring and a README. The suffix
+        # "S.r.l." is ordinary Italian vocabulary and is not what identifies a
+        # company, so this checks the actual name instead: the bundled template
+        # must still be the invented one.
+        run: |
+          python - <<'PY'
+          import sys, yaml
+          issuer = yaml.safe_load(
+              open("templates/it.sample-vendor.yml"))["issuer"]
+          if "Sample" not in issuer:
+              print(f"bundled template names a real counterparty: {issuer!r}")
+              sys.exit(1)
+          print(f"bundled template is synthetic: {issuer!r}")
+          PY
+          # A layout whose filename carries a company name leaks the name even
+          # when its contents are scrubbed, because the filename is in the URL.
+          if ls bizflow/layouts/ | grep -vE '^it\.[a-z0-9-]+\.yml$' ; then
+            echo "layout filename does not look like a generic vendor slug"
+            exit 1
+          fi

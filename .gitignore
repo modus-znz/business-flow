@@ -1,0 +1,11 @@
+__pycache__/
+*.egg-info/
+*.pyc
+bizflow-out/
+out/
+.venv/
+
+# Only the synthetic sample invoice is ever committed. A real supplier's PDF
+# dropped into invoices/ is ignored rather than waiting for someone to notice.
+invoices/*
+!invoices/sample-invoice.pdf

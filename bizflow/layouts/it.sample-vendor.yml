@@ -1,0 +1,27 @@
+# Sample line-item column layout for an Italian wholesale invoice.
+#
+# SYNTHETIC EXAMPLE, paired with templates/it.sample-vendor.yml. The column
+# header names below are the ordinary Italian wholesale vocabulary (quantity,
+# pack multiple, unit price, line total) rather than anything specific to a
+# counterparty.
+#
+# How the harvest works: words are picked by x-distance from each header's
+# centre, so a header name is matched as it is *printed*, not as it is
+# normalised. A compound header is a word sequence; the x-centre of the LAST
+# word anchors the column. `tol` is the half-width in points within which a
+# candidate word is considered to be in that column — raise it when a column is
+# crowded, lower it when neighbouring columns bleed into each other.
+code_regex: '^\d{13}$'          # EAN-13, printed as the first token of the row
+columns:
+  qty:
+    header: "Q.tà"
+    type: int
+  mpl:
+    header: "Mpl"               # pack multiple
+    type: int
+  price: "Prezzo"
+  total:
+    header: ["P.zo", "Totale"]
+  piece_price:
+    header: ["P.zo", "Pz", "Imp."]
+    tol: 30

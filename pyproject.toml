@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bizflow"
+version = "0.1.0"
+description = "Invoice/document chain: fetch, convert, extract, analyze, optimize"
+requires-python = ">=3.11"
+dependencies = [
+    "pdfplumber",
+    "invoice2data",
+    "duckdb",
+    "markitdown[pdf]",
+    "stockpyl",
+    "ortools",
+    "pyyaml",
+]
+
+[project.scripts]
+bizflow = "bizflow.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["bizflow*"]
+
+[tool.setuptools.package-data]
+bizflow = ["layouts/*.yml"]

@@ -1,0 +1,7 @@
+pdfplumber
+invoice2data
+duckdb
+markitdown[pdf]
+stockpyl
+ortools
+pyyaml

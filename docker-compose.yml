@@ -1,0 +1,47 @@
+# A one-shot CLI, not a service.
+#
+#   docker compose run --rm extract
+#   docker compose run --rm shell            # interactive, /work is mounted
+#   docker compose run --rm optimize
+#
+# The bundled invoice and layouts are synthetic. Point MOUNTS at a directory
+# outside this repository for real supplier data — see docs/OPERATIONS.md,
+# "Handling the output". Do not commit real invoices into ./invoices.
+
+services:
+  # process an invoice into /out. Stale synthetic sample is pre-seeded.
+  extract:
+    build: .
+    volumes:
+      - ./invoices:/invoices:ro
+      - ./out:/out
+    command: >
+      process /invoices/sample-invoice.pdf
+      --out /out
+      --layout /app/bizflow/layouts/it.sample-vendor.yml
+
+  # reconciliation + Pareto over an already-extracted CSV
+  analyze:
+    build: .
+    volumes:
+      - ./out:/out
+    command: analyze /out/sample-invoice-items.csv
+
+  # EOQ + pallet plan. These are business assumptions, so they are arguments
+  # here rather than defaults baked into the image.
+  optimize:
+    build: .
+    volumes:
+      - ./out:/out
+    command: optimize /out/sample-invoice-items.csv --pallet-cap 450
+
+  # an interactive shell in the tool's environment
+  shell:
+    build: .
+    entrypoint: /bin/bash
+    tty: true
+    stdin_open: true
+    volumes:
+      - .:/work
+      - ./out:/out
+    working_dir: /work
